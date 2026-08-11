@@ -1,0 +1,1 @@
+# moni-spring-boot-starter
