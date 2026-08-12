@@ -14,3 +14,7 @@ out/
 .DS_Store
 
 .omc/
+
+CLAUDE.md
+MEMORY.md
+*.pdf
