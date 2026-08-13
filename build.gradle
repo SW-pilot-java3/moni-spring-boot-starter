@@ -16,6 +16,10 @@ dependencyManagement {
     imports { mavenBom SpringBootPlugin.BOM_COORDINATES }
 }
 
+configurations {
+    mockitoAgent
+}
+
 dependencies {
     compileOnly 'org.springframework.boot:spring-boot-starter-web'
     compileOnly 'org.springframework.boot:spring-boot-starter-actuator'
@@ -25,10 +29,16 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.micrometer:micrometer-core'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    mockitoAgent('org.mockito:mockito-core') { transitive = false }
 }
 
 jar { enabled = true; archiveClassifier = '' }
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Mockito의 inline mock maker가 JDK에 동적으로 자가-attach하는 것을 막기 위해
+    // mockito-core를 정식 -javaagent로 등록한다 (JDK 21+ 동적 agent 로딩 제한 대응)
+    jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
 }
