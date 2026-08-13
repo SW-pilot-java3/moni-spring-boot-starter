@@ -1,7 +1,7 @@
-package com.moni.domain.metric.dto;
+package com.moni.domain.metric.dto.request;
 
-import com.moni.domain.instance.dto.InstanceMetrics;
-import com.moni.domain.server.dto.ServerMetrics;
+import com.moni.domain.instance.dto.request.InstanceMetrics;
+import com.moni.domain.server.dto.request.ServerMetrics;
 import java.time.Instant;
 
 public record MetricsPayload(Instant collectedAt, ServerMetrics server, InstanceMetrics instance) {

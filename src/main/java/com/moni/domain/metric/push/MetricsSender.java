@@ -1,6 +1,6 @@
 package com.moni.domain.metric.push;
 
-import com.moni.domain.metric.dto.MetricsPayload;
+import com.moni.domain.metric.dto.request.MetricsPayload;
 import com.moni.global.config.MoniProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;

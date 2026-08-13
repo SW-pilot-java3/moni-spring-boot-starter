@@ -1,7 +1,7 @@
 package com.moni.domain.metric.push;
 
 import com.moni.domain.instance.collector.InstanceMetricsCollector;
-import com.moni.domain.metric.dto.MetricsPayload;
+import com.moni.domain.metric.dto.request.MetricsPayload;
 import com.moni.domain.server.collector.ServerMetricsCollector;
 import com.moni.global.config.MoniProperties;
 import java.time.Instant;
