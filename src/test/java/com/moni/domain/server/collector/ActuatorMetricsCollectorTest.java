@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.moni.domain.server.dto.request.ExecutorMetrics;
 import com.moni.domain.server.dto.request.HikariPoolMetrics;
+import com.moni.domain.server.dto.request.HttpEndpointMetrics;
 import com.moni.domain.server.dto.request.ServerMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -55,17 +57,9 @@ class ActuatorMetricsCollectorTest {
         assertThat(metrics.processUptimeSeconds()).isNull();
         assertThat(metrics.jvmThreadsLive()).isNull();
         assertThat(metrics.jvmThreadsBlocked()).isNull();
-        assertThat(metrics.httpRequestsCount()).isNull();
-        assertThat(metrics.httpRequestsSum()).isNull();
-        assertThat(metrics.httpRequestsMax()).isNull();
-        assertThat(metrics.httpErrorsCount()).isNull();
-        assertThat(metrics.tomcatThreadsBusy()).isNull();
-        assertThat(metrics.tomcatThreadsConfigMax()).isNull();
+        assertThat(metrics.httpEndpoints()).isEmpty();
         assertThat(metrics.hikaricpPools()).isEmpty();
-        assertThat(metrics.executorActive()).isNull();
-        assertThat(metrics.executorMax()).isNull();
-        assertThat(metrics.executorQueuedTasks()).isNull();
-        assertThat(metrics.executorQueueRemaining()).isNull();
+        assertThat(metrics.executors()).isEmpty();
     }
 
     @Test
@@ -123,44 +117,62 @@ class ActuatorMetricsCollectorTest {
     }
 
     @Test
-    void aggregatesHttpRequestTimersAcrossTagsAndCountsErrors() {
+    void collectsHttpMetricsPerEndpointBrokenDownByUriMethodAndStatus() {
         MeterRegistry registry = new SimpleMeterRegistry();
-        Timer ok = Timer.builder("http.server.requests").tag("status", "200").tag("uri", "/a").register(registry);
-        Timer notFound = Timer.builder("http.server.requests")
-                .tag("status", "404").tag("uri", "/b").register(registry);
-        Timer serverError = Timer.builder("http.server.requests")
-                .tag("status", "500").tag("uri", "/c").register(registry);
-        ok.record(Duration.ofMillis(100));
-        ok.record(Duration.ofMillis(300));
-        notFound.record(Duration.ofMillis(50));
-        serverError.record(Duration.ofMillis(900));
+        Timer getUsersOk = Timer.builder("http.server.requests")
+                .tag("uri", "/api/users").tag("method", "GET").tag("status", "200")
+                .register(registry);
+        Timer getUsersNotFound = Timer.builder("http.server.requests")
+                .tag("uri", "/api/users").tag("method", "GET").tag("status", "404")
+                .register(registry);
+        Timer postOrdersError = Timer.builder("http.server.requests")
+                .tag("uri", "/api/orders").tag("method", "POST").tag("status", "500")
+                .register(registry);
+        getUsersOk.record(Duration.ofMillis(100));
+        getUsersOk.record(Duration.ofMillis(300));
+        getUsersNotFound.record(Duration.ofMillis(50));
+        postOrdersError.record(Duration.ofMillis(900));
 
         ServerMetrics metrics = new ActuatorMetricsCollector(registry).collect();
 
-        assertThat(metrics.httpRequestsCount()).isEqualTo(4L);
-        assertThat(metrics.httpRequestsSum()).isCloseTo(1.35, offset(0.001));
-        assertThat(metrics.httpRequestsMax()).isCloseTo(0.9, offset(0.001));
-        assertThat(metrics.httpErrorsCount()).isEqualTo(2L);
+        assertThat(metrics.httpEndpoints()).hasSize(3);
+        assertThat(metrics.httpEndpoints())
+                .filteredOn(endpoint -> endpoint.status().equals("200"))
+                .singleElement()
+                .satisfies(endpoint -> {
+                    assertThat(endpoint.uri()).isEqualTo("/api/users");
+                    assertThat(endpoint.method()).isEqualTo("GET");
+                    assertThat(endpoint.requestsCount()).isEqualTo(2L);
+                    assertThat(endpoint.requestsSum()).isCloseTo(0.4, offset(0.001));
+                    assertThat(endpoint.requestsMax()).isCloseTo(0.3, offset(0.001));
+                });
+        assertThat(metrics.httpEndpoints())
+                .filteredOn(endpoint -> endpoint.status().equals("500"))
+                .singleElement()
+                .satisfies(endpoint -> {
+                    assertThat(endpoint.uri()).isEqualTo("/api/orders");
+                    assertThat(endpoint.method()).isEqualTo("POST");
+                    assertThat(endpoint.requestsCount()).isEqualTo(1L);
+                });
     }
 
     @Test
-    void readsExecutorAndTomcatMetersWhenPresent() {
+    void excludesInternalActuatorEndpointsFromHttpMetrics() {
         MeterRegistry registry = new SimpleMeterRegistry();
-        registry.gauge("executor.active", 1.0);
-        registry.gauge("executor.pool.max", 20.0);
-        registry.gauge("executor.queued", 5.0);
-        registry.gauge("executor.queue.remaining", 95.0);
-        registry.gauge("tomcat.threads.busy", 4.0);
-        registry.gauge("tomcat.threads.config.max", 200.0);
+        Timer health = Timer.builder("http.server.requests")
+                .tag("uri", "/actuator/health").tag("method", "GET").tag("status", "200")
+                .register(registry);
+        Timer business = Timer.builder("http.server.requests")
+                .tag("uri", "/api/orders").tag("method", "GET").tag("status", "200")
+                .register(registry);
+        health.record(Duration.ofMillis(5));
+        business.record(Duration.ofMillis(50));
 
         ServerMetrics metrics = new ActuatorMetricsCollector(registry).collect();
 
-        assertThat(metrics.executorActive()).isEqualTo(1);
-        assertThat(metrics.executorMax()).isEqualTo(20);
-        assertThat(metrics.executorQueuedTasks()).isEqualTo(5);
-        assertThat(metrics.executorQueueRemaining()).isEqualTo(95);
-        assertThat(metrics.tomcatThreadsBusy()).isEqualTo(4);
-        assertThat(metrics.tomcatThreadsConfigMax()).isEqualTo(200);
+        assertThat(metrics.httpEndpoints())
+                .extracting(HttpEndpointMetrics::uri)
+                .containsExactly("/api/orders");
     }
 
     @Test
@@ -196,6 +208,28 @@ class ActuatorMetricsCollectorTest {
                 });
     }
 
+    @Test
+    void groupsExecutorMetricsByNameTagInsteadOfMergingThem() {
+        MeterRegistry registry = new SimpleMeterRegistry();
+        registerExecutor(registry, "taskExecutor", 3, 10, 2, 8);
+        registerExecutor(registry, "emailExecutor", 1, 5, 0, 5);
+
+        ServerMetrics metrics = new ActuatorMetricsCollector(registry).collect();
+
+        assertThat(metrics.executors())
+                .extracting(ExecutorMetrics::name)
+                .containsExactlyInAnyOrder("taskExecutor", "emailExecutor");
+        assertThat(metrics.executors())
+                .filteredOn(executor -> executor.name().equals("taskExecutor"))
+                .singleElement()
+                .satisfies(executor -> {
+                    assertThat(executor.active()).isEqualTo(3);
+                    assertThat(executor.max()).isEqualTo(10);
+                    assertThat(executor.queuedTasks()).isEqualTo(2);
+                    assertThat(executor.queueRemaining()).isEqualTo(8);
+                });
+    }
+
     private void registerMemoryPool(MeterRegistry registry, String area, String poolId, double used, double max) {
         Gauge.builder("jvm.memory.used", () -> used).tag("area", area).tag("id", poolId).register(registry);
         Gauge.builder("jvm.memory.max", () -> max).tag("area", area).tag("id", poolId).register(registry);
@@ -208,5 +242,13 @@ class ActuatorMetricsCollectorTest {
         Gauge.builder("hikaricp.connections.pending", () -> pending).tag("pool", poolName).register(registry);
         Gauge.builder("hikaricp.connections.max", () -> max).tag("pool", poolName).register(registry);
         Counter.builder("hikaricp.connections.timeout").tag("pool", poolName).register(registry).increment(timeouts);
+    }
+
+    private void registerExecutor(MeterRegistry registry, String name, double active, double max,
+            double queued, double queueRemaining) {
+        Gauge.builder("executor.active", () -> active).tag("name", name).register(registry);
+        Gauge.builder("executor.pool.max", () -> max).tag("name", name).register(registry);
+        Gauge.builder("executor.queued", () -> queued).tag("name", name).register(registry);
+        Gauge.builder("executor.queue.remaining", () -> queueRemaining).tag("name", name).register(registry);
     }
 }

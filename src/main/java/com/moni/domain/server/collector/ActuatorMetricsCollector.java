@@ -1,6 +1,8 @@
 package com.moni.domain.server.collector;
 
+import com.moni.domain.server.dto.request.ExecutorMetrics;
 import com.moni.domain.server.dto.request.HikariPoolMetrics;
+import com.moni.domain.server.dto.request.HttpEndpointMetrics;
 import com.moni.domain.server.dto.request.ServerMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -20,6 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ActuatorMetricsCollector implements ServerMetricsCollector {
 
+    private static final String INTERNAL_MONITORING_URI_PREFIX = "/actuator";
+
     private final MeterRegistry registry;
 
     @Override
@@ -33,8 +37,6 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
     }
 
     private ServerMetrics extract() {
-        Collection<Timer> httpTimers = registry.find("http.server.requests").timers();
-
         return ServerMetrics.builder()
                 .jvmHeapUsedBytes(sumGauges())
                 .jvmHeapMaxBytes(sumPositiveGauges())
@@ -44,40 +46,64 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
                 .processUptimeSeconds(sumGaugeValue("process.uptime"))
                 .jvmThreadsLive(sumIntGaugeValue("jvm.threads.live"))
                 .jvmThreadsBlocked(sumIntGaugeValue("jvm.threads.states", "state", "blocked"))
-                .httpRequestsCount(httpRequestsCount(httpTimers))
-                .httpRequestsSum(httpRequestsSum(httpTimers))
-                .httpRequestsMax(httpRequestsMax(httpTimers))
-                .httpErrorsCount(httpErrorsCount(httpTimers))
-                .tomcatThreadsBusy(sumIntGaugeValue("tomcat.threads.busy"))
-                .tomcatThreadsConfigMax(sumIntGaugeValue("tomcat.threads.config.max"))
+                .httpEndpoints(httpEndpointMetrics())
                 .hikaricpPools(hikariPoolMetrics())
-                .executorActive(sumIntGaugeValue("executor.active"))
-                .executorMax(sumIntGaugeValue("executor.pool.max"))
-                .executorQueuedTasks(sumIntGaugeValue("executor.queued"))
-                .executorQueueRemaining(sumIntGaugeValue("executor.queue.remaining"))
+                .executors(executorMetrics())
                 .build();
     }
 
-    private List<HikariPoolMetrics> hikariPoolMetrics() {
-        Set<String> poolNames = registry.find("hikaricp.connections.active").gauges().stream()
-                .map(gauge -> gauge.getId().getTag("pool"))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        return poolNames.stream()
-                .map(poolName -> HikariPoolMetrics.builder()
-                        .poolName(poolName)
-                        .active(intGaugeValueForPool("hikaricp.connections.active", poolName))
-                        .idle(intGaugeValueForPool("hikaricp.connections.idle", poolName))
-                        .pending(intGaugeValueForPool("hikaricp.connections.pending", poolName))
-                        .max(intGaugeValueForPool("hikaricp.connections.max", poolName))
-                        .timeoutsTotal(counterValueForPool("hikaricp.connections.timeout", poolName))
+    private List<HttpEndpointMetrics> httpEndpointMetrics() {
+        return registry.find("http.server.requests").timers().stream()
+                .filter(timer -> !isInternalMonitoringUri(timer.getId().getTag("uri")))
+                .map(timer -> HttpEndpointMetrics.builder()
+                        .uri(timer.getId().getTag("uri"))
+                        .method(timer.getId().getTag("method"))
+                        .status(timer.getId().getTag("status"))
+                        .requestsCount(timer.count())
+                        .requestsSum(timer.totalTime(TimeUnit.SECONDS))
+                        .requestsMax(timer.max(TimeUnit.SECONDS))
                         .build())
                 .toList();
     }
 
-    private Integer intGaugeValueForPool(String name, String poolName) {
-        Gauge gauge = registry.find(name).tag("pool", poolName).gauge();
+    private static boolean isInternalMonitoringUri(String uri) {
+        return uri != null && uri.startsWith(INTERNAL_MONITORING_URI_PREFIX);
+    }
+
+    private List<HikariPoolMetrics> hikariPoolMetrics() {
+        return tagValues("hikaricp.connections.active", "pool").stream()
+                .map(poolName -> HikariPoolMetrics.builder()
+                        .poolName(poolName)
+                        .active(intGaugeValue("hikaricp.connections.active", "pool", poolName))
+                        .idle(intGaugeValue("hikaricp.connections.idle", "pool", poolName))
+                        .pending(intGaugeValue("hikaricp.connections.pending", "pool", poolName))
+                        .max(intGaugeValue("hikaricp.connections.max", "pool", poolName))
+                        .timeoutsTotal(counterValue("hikaricp.connections.timeout", "pool", poolName))
+                        .build())
+                .toList();
+    }
+
+    private List<ExecutorMetrics> executorMetrics() {
+        return tagValues("executor.active", "name").stream()
+                .map(name -> ExecutorMetrics.builder()
+                        .name(name)
+                        .active(intGaugeValue("executor.active", "name", name))
+                        .max(intGaugeValue("executor.pool.max", "name", name))
+                        .queuedTasks(intGaugeValue("executor.queued", "name", name))
+                        .queueRemaining(intGaugeValue("executor.queue.remaining", "name", name))
+                        .build())
+                .toList();
+    }
+
+    private Set<String> tagValues(String meterName, String tagKey) {
+        return registry.find(meterName).gauges().stream()
+                .map(gauge -> gauge.getId().getTag(tagKey))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Integer intGaugeValue(String name, String tagKey, String tagValue) {
+        Gauge gauge = registry.find(name).tag(tagKey, tagValue).gauge();
         if (gauge == null) {
             return null;
         }
@@ -85,38 +111,9 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
         return Double.isNaN(value) ? null : (int) value;
     }
 
-    private Long counterValueForPool(String name, String poolName) {
-        Counter counter = registry.find(name).tag("pool", poolName).counter();
+    private Long counterValue(String name, String tagKey, String tagValue) {
+        Counter counter = registry.find(name).tag(tagKey, tagValue).counter();
         return counter != null ? (long) counter.count() : null;
-    }
-
-    private Long httpRequestsCount(Collection<Timer> httpTimers) {
-        return httpTimers.isEmpty() ? null : httpTimers.stream().mapToLong(Timer::count).sum();
-    }
-
-    private Double httpRequestsSum(Collection<Timer> httpTimers) {
-        return httpTimers.isEmpty() ? null
-                : httpTimers.stream().mapToDouble(timer -> timer.totalTime(TimeUnit.SECONDS)).sum();
-    }
-
-    private Double httpRequestsMax(Collection<Timer> httpTimers) {
-        return httpTimers.isEmpty() ? null
-                : httpTimers.stream().mapToDouble(timer -> timer.max(TimeUnit.SECONDS)).max().getAsDouble();
-    }
-
-    private Long httpErrorsCount(Collection<Timer> httpTimers) {
-        if (httpTimers.isEmpty()) {
-            return null;
-        }
-        return httpTimers.stream()
-                .filter(ActuatorMetricsCollector::isErrorStatus)
-                .mapToLong(Timer::count)
-                .sum();
-    }
-
-    private static boolean isErrorStatus(Timer timer) {
-        String status = timer.getId().getTag("status");
-        return status != null && (status.startsWith("4") || status.startsWith("5"));
     }
 
     private Long oldGenUsedBytes() {
