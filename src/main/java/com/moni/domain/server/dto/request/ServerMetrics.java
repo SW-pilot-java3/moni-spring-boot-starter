@@ -15,20 +15,12 @@ public record ServerMetrics(
         Integer jvmThreadsLive,
         Integer jvmThreadsBlocked,
 
-        // HTTP (WAS)
-        Long httpRequestsCount,
-        Double httpRequestsSum,
-        Double httpRequestsMax,
-        Long httpErrorsCount,
-        Integer tomcatThreadsBusy,
-        Integer tomcatThreadsConfigMax,
+        // HTTP (WAS) — 엔드포인트(uri·method·status) 단위로 나눠서 담는다
+        List<HttpEndpointMetrics> httpEndpoints,
 
-        // HikariCP — 풀(DataSource)이 여러 개일 수 있어 풀 단위로 나눠서 담는다
+        // HikariCP — 풀(DataSource) 단위로 나눠서 담는다
         List<HikariPoolMetrics> hikaricpPools,
 
-        // Executor
-        Integer executorActive,
-        Integer executorMax,
-        Integer executorQueuedTasks,
-        Integer executorQueueRemaining) {
+        // Executor — 스레드풀 이름 단위로 나눠서 담는다
+        List<ExecutorMetrics> executors) {
 }
