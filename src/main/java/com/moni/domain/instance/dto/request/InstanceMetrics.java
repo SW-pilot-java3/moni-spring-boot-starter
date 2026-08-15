@@ -1,14 +1,14 @@
 package com.moni.domain.instance.dto.request;
 
+import java.util.List;
 import lombok.Builder;
 
 @Builder
 public record InstanceMetrics(
-        // CPU
         Double cpuSecondsTotal,
-        Double cpuIOwaitSecondsTotal,
+        Double cpuIdleSecondsTotal,
+        Double cpuIOWaitSecondsTotal,
 
-        // Memory
         Long memTotalBytes,
         Long memFreeBytes,
         Long memAvailableBytes,
@@ -17,18 +17,11 @@ public record InstanceMetrics(
         Long swapTotalBytes,
         Long swapFreeBytes,
 
-        // Disk I/O
-        Long diskReadsTotal,
-        Long diskWritesTotal,
-        Long diskReadBytesTotal,
-        Long diskWrittenBytesTotal,
-        Double diskIoTimeSecondsTotal,
-        Long fsSizeBytes,
-        Long fsAvailBytes,
+        List<InstanceCpuMetrics> cpus,
 
-        // Network
-        Long netRxBytesTotal,
-        Long netTxBytesTotal,
-        Long netRxErrorsTotal,
-        Long netTxErrorsTotal) {
+        List<InstanceDiskMetrics> disks,
+
+        List<InstanceFilesystemMetrics> filesystems,
+
+        List<InstanceNetworkMetrics> networks) {
 }

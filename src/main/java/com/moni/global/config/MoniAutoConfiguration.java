@@ -1,6 +1,7 @@
 package com.moni.global.config;
 
 import com.moni.domain.instance.collector.InstanceMetricsCollector;
+import com.moni.domain.instance.collector.NodeExporterMetricsCollector;
 import com.moni.domain.metric.push.MetricsPusher;
 import com.moni.domain.metric.push.MetricsSender;
 import com.moni.domain.metric.push.RetryQueue;
@@ -49,6 +50,13 @@ public class MoniAutoConfiguration {
     @ConditionalOnBean(MeterRegistry.class)
     public ServerMetricsCollector moniServerMetricsCollector(MeterRegistry registry) {
         return new ActuatorMetricsCollector(registry);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "moni", name = "collect-host-metrics", havingValue = "true", matchIfMissing = true)
+    public InstanceMetricsCollector moniInstanceMetricsCollector(MoniProperties properties) {
+        return new NodeExporterMetricsCollector(properties);
     }
 
     @Bean(initMethod = "start", destroyMethod = "stop")
