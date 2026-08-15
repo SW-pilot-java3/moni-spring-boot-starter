@@ -4,9 +4,13 @@ import com.moni.domain.instance.collector.InstanceMetricsCollector;
 import com.moni.domain.metric.push.MetricsPusher;
 import com.moni.domain.metric.push.MetricsSender;
 import com.moni.domain.metric.push.RetryQueue;
+import com.moni.domain.server.collector.ActuatorMetricsCollector;
 import com.moni.domain.server.collector.ServerMetricsCollector;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -14,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.util.StringUtils;
 
 @AutoConfiguration
+@AutoConfigureAfter(name = "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration")
 @EnableConfigurationProperties(MoniProperties.class)
 @ConditionalOnProperty(prefix = "moni", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class MoniAutoConfiguration {
@@ -37,6 +42,13 @@ public class MoniAutoConfiguration {
     @ConditionalOnMissingBean
     public RetryQueue moniRetryQueue(MoniProperties properties) {
         return new RetryQueue(properties.getRetryQueueSize());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(MeterRegistry.class)
+    public ServerMetricsCollector moniServerMetricsCollector(MeterRegistry registry) {
+        return new ActuatorMetricsCollector(registry);
     }
 
     @Bean(initMethod = "start", destroyMethod = "stop")

@@ -1,4 +1,4 @@
-package com.moni.domain.instance.dto;
+package com.moni.domain.instance.dto.request;
 
 import lombok.Builder;
 

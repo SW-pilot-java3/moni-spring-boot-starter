@@ -1,6 +1,6 @@
 package com.moni.domain.metric.push;
 
-import com.moni.domain.metric.dto.MetricsPayload;
+import com.moni.domain.metric.dto.request.MetricsPayload;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
