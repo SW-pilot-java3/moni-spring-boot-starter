@@ -7,7 +7,7 @@ import lombok.Builder;
 public record InstanceMetrics(
         Double cpuSecondsTotal,
         Double cpuIdleSecondsTotal,
-        Double cpuIOWaitSecondsTotal,
+        Double cpuIowaitSecondsTotal,
 
         Long memTotalBytes,
         Long memFreeBytes,

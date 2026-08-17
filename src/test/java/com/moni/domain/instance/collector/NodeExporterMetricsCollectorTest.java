@@ -70,7 +70,7 @@ class NodeExporterMetricsCollectorTest {
 
         assertThat(metrics.cpuSecondsTotal()).isCloseTo(3671.0, offset(0.001));
         assertThat(metrics.cpuIdleSecondsTotal()).isCloseTo(3100.5, offset(0.001));
-        assertThat(metrics.cpuIOWaitSecondsTotal()).isCloseTo(20.5, offset(0.001));
+        assertThat(metrics.cpuIowaitSecondsTotal()).isCloseTo(20.5, offset(0.001));
     }
 
     @Test

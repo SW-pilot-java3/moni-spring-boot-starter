@@ -70,7 +70,7 @@ public class NodeExporterMetricsCollector implements InstanceMetricsCollector {
                 .cpuSecondsTotal(sumValues(samples, NodeExporterMetric.CPU_SECONDS_TOTAL))
                 .cpuIdleSecondsTotal(sumValues(samples, NodeExporterMetric.CPU_SECONDS_TOTAL,
                         NodeExporterLabel.MODE, CpuMode.IDLE.value()))
-                .cpuIOWaitSecondsTotal(sumValues(samples, NodeExporterMetric.CPU_SECONDS_TOTAL,
+                .cpuIowaitSecondsTotal(sumValues(samples, NodeExporterMetric.CPU_SECONDS_TOTAL,
                         NodeExporterLabel.MODE, CpuMode.IOWAIT.value()))
                 .memTotalBytes(singleLongValue(samples, NodeExporterMetric.MEM_TOTAL_BYTES))
                 .memFreeBytes(singleLongValue(samples, NodeExporterMetric.MEM_FREE_BYTES))
