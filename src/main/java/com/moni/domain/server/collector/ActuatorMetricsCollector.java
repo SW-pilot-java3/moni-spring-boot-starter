@@ -1,5 +1,9 @@
 package com.moni.domain.server.collector;
 
+import com.moni.domain.server.constant.MemoryArea;
+import com.moni.domain.server.constant.MicrometerMeter;
+import com.moni.domain.server.constant.MicrometerTag;
+import com.moni.domain.server.constant.OldGenPoolMarker;
 import com.moni.domain.server.dto.request.ExecutorMetrics;
 import com.moni.domain.server.dto.request.HikariPoolMetrics;
 import com.moni.domain.server.dto.request.HttpEndpointMetrics;
@@ -43,9 +47,10 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
                 .jvmOldGenUsedBytes(oldGenUsedBytes())
                 .gcPauseSecondsCount(gcPauseSecondsCount())
                 .gcPauseSecondsSum(gcPauseSecondsSum())
-                .processUptimeSeconds(sumGaugeValue("process.uptime"))
-                .jvmThreadsLive(sumIntGaugeValue("jvm.threads.live"))
-                .jvmThreadsBlocked(sumIntGaugeValue("jvm.threads.states", "state", "blocked"))
+                .processUptimeSeconds(sumGaugeValue(MicrometerMeter.PROCESS_UPTIME))
+                .jvmThreadsLive(sumIntGaugeValue(MicrometerMeter.JVM_THREADS_LIVE))
+                .jvmThreadsBlocked(sumIntGaugeValue(MicrometerMeter.JVM_THREADS_STATES,
+                        MicrometerTag.STATE.key(), "blocked"))
                 .httpEndpoints(httpEndpointMetrics())
                 .hikaricpPools(hikariPoolMetrics())
                 .executors(executorMetrics())
@@ -53,12 +58,12 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
     }
 
     private List<HttpEndpointMetrics> httpEndpointMetrics() {
-        return registry.find("http.server.requests").timers().stream()
-                .filter(timer -> !isInternalMonitoringUri(timer.getId().getTag("uri")))
+        return registry.find(MicrometerMeter.HTTP_SERVER_REQUESTS.meterName()).timers().stream()
+                .filter(timer -> !isInternalMonitoringUri(timer.getId().getTag(MicrometerTag.URI.key())))
                 .map(timer -> HttpEndpointMetrics.builder()
-                        .uri(timer.getId().getTag("uri"))
-                        .method(timer.getId().getTag("method"))
-                        .status(timer.getId().getTag("status"))
+                        .uri(timer.getId().getTag(MicrometerTag.URI.key()))
+                        .method(timer.getId().getTag(MicrometerTag.METHOD.key()))
+                        .status(timer.getId().getTag(MicrometerTag.STATUS.key()))
                         .requestsCount(timer.count())
                         .requestsSum(timer.totalTime(TimeUnit.SECONDS))
                         .requestsMax(timer.max(TimeUnit.SECONDS))
@@ -71,39 +76,39 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
     }
 
     private List<HikariPoolMetrics> hikariPoolMetrics() {
-        return tagValues("hikaricp.connections.active", "pool").stream()
+        return tagValues(MicrometerMeter.HIKARICP_CONNECTIONS_ACTIVE, MicrometerTag.POOL).stream()
                 .map(poolName -> HikariPoolMetrics.builder()
                         .poolName(poolName)
-                        .active(intGaugeValue("hikaricp.connections.active", "pool", poolName))
-                        .idle(intGaugeValue("hikaricp.connections.idle", "pool", poolName))
-                        .pending(intGaugeValue("hikaricp.connections.pending", "pool", poolName))
-                        .max(intGaugeValue("hikaricp.connections.max", "pool", poolName))
-                        .timeoutsTotal(counterValue("hikaricp.connections.timeout", "pool", poolName))
+                        .active(intGaugeValue(MicrometerMeter.HIKARICP_CONNECTIONS_ACTIVE, MicrometerTag.POOL, poolName))
+                        .idle(intGaugeValue(MicrometerMeter.HIKARICP_CONNECTIONS_IDLE, MicrometerTag.POOL, poolName))
+                        .pending(intGaugeValue(MicrometerMeter.HIKARICP_CONNECTIONS_PENDING, MicrometerTag.POOL, poolName))
+                        .max(intGaugeValue(MicrometerMeter.HIKARICP_CONNECTIONS_MAX, MicrometerTag.POOL, poolName))
+                        .timeoutsTotal(counterValue(MicrometerMeter.HIKARICP_CONNECTIONS_TIMEOUT, MicrometerTag.POOL, poolName))
                         .build())
                 .toList();
     }
 
     private List<ExecutorMetrics> executorMetrics() {
-        return tagValues("executor.active", "name").stream()
+        return tagValues(MicrometerMeter.EXECUTOR_ACTIVE, MicrometerTag.NAME).stream()
                 .map(name -> ExecutorMetrics.builder()
                         .name(name)
-                        .active(intGaugeValue("executor.active", "name", name))
-                        .max(intGaugeValue("executor.pool.max", "name", name))
-                        .queuedTasks(intGaugeValue("executor.queued", "name", name))
-                        .queueRemaining(intGaugeValue("executor.queue.remaining", "name", name))
+                        .active(intGaugeValue(MicrometerMeter.EXECUTOR_ACTIVE, MicrometerTag.NAME, name))
+                        .max(intGaugeValue(MicrometerMeter.EXECUTOR_POOL_MAX, MicrometerTag.NAME, name))
+                        .queuedTasks(intGaugeValue(MicrometerMeter.EXECUTOR_QUEUED, MicrometerTag.NAME, name))
+                        .queueRemaining(intGaugeValue(MicrometerMeter.EXECUTOR_QUEUE_REMAINING, MicrometerTag.NAME, name))
                         .build())
                 .toList();
     }
 
-    private Set<String> tagValues(String meterName, String tagKey) {
-        return registry.find(meterName).gauges().stream()
-                .map(gauge -> gauge.getId().getTag(tagKey))
+    private Set<String> tagValues(MicrometerMeter meter, MicrometerTag tag) {
+        return registry.find(meter.meterName()).gauges().stream()
+                .map(gauge -> gauge.getId().getTag(tag.key()))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private Integer intGaugeValue(String name, String tagKey, String tagValue) {
-        Gauge gauge = registry.find(name).tag(tagKey, tagValue).gauge();
+    private Integer intGaugeValue(MicrometerMeter meter, MicrometerTag tag, String tagValue) {
+        Gauge gauge = registry.find(meter.meterName()).tag(tag.key(), tagValue).gauge();
         if (gauge == null) {
             return null;
         }
@@ -111,15 +116,16 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
         return Double.isNaN(value) ? null : (int) value;
     }
 
-    private Long counterValue(String name, String tagKey, String tagValue) {
-        Counter counter = registry.find(name).tag(tagKey, tagValue).counter();
+    private Long counterValue(MicrometerMeter meter, MicrometerTag tag, String tagValue) {
+        Counter counter = registry.find(meter.meterName()).tag(tag.key(), tagValue).counter();
         return counter != null ? (long) counter.count() : null;
     }
 
     private Long oldGenUsedBytes() {
-        // GC 종류별로 old gen pool의 id 태그명이 다름 (G1: "G1 Old Gen", Parallel: "PS Old Gen", Serial: "Tenured Gen")
-        return registry.find("jvm.memory.used").tag("area", "heap").gauges().stream()
-                .filter(gauge -> isOldGenPool(gauge.getId().getTag("id")))
+        return registry.find(MicrometerMeter.JVM_MEMORY_USED.meterName())
+                .tag(MicrometerTag.AREA.key(), MemoryArea.HEAP.value())
+                .gauges().stream()
+                .filter(gauge -> OldGenPoolMarker.matchesPoolId(gauge.getId().getTag(MicrometerTag.ID.key())))
                 .findFirst()
                 .map(Gauge::value)
                 .filter(value -> !Double.isNaN(value))
@@ -127,23 +133,21 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
                 .orElse(null);
     }
 
-    private static boolean isOldGenPool(String poolId) {
-        return poolId != null && (poolId.contains("Old") || poolId.contains("Tenured"));
-    }
-
     private Long gcPauseSecondsCount() {
-        Collection<Timer> timers = registry.find("jvm.gc.pause").timers();
+        Collection<Timer> timers = registry.find(MicrometerMeter.JVM_GC_PAUSE.meterName()).timers();
         return timers.isEmpty() ? null : timers.stream().mapToLong(Timer::count).sum();
     }
 
     private Double gcPauseSecondsSum() {
-        Collection<Timer> timers = registry.find("jvm.gc.pause").timers();
+        Collection<Timer> timers = registry.find(MicrometerMeter.JVM_GC_PAUSE.meterName()).timers();
         return timers.isEmpty() ? null
                 : timers.stream().mapToDouble(timer -> timer.totalTime(TimeUnit.SECONDS)).sum();
     }
 
     private Long sumGauges() {
-        Collection<Gauge> gauges = registry.find("jvm.memory.used").tag("area", "heap").gauges();
+        Collection<Gauge> gauges = registry.find(MicrometerMeter.JVM_MEMORY_USED.meterName())
+                .tag(MicrometerTag.AREA.key(), MemoryArea.HEAP.value())
+                .gauges();
         if (gauges.isEmpty()) {
             return null;
         }
@@ -151,8 +155,9 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
     }
 
     private Long sumPositiveGauges() {
-        // 일부 메모리 풀은 max가 정의되지 않으면 -1을 반환하므로 합산에서 제외한다
-        Collection<Gauge> gauges = registry.find("jvm.memory.max").tag("area", "heap").gauges();
+        Collection<Gauge> gauges = registry.find(MicrometerMeter.JVM_MEMORY_MAX.meterName())
+                .tag(MicrometerTag.AREA.key(), MemoryArea.HEAP.value())
+                .gauges();
         if (gauges.isEmpty()) {
             return null;
         }
@@ -160,16 +165,16 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
         return (long) sum;
     }
 
-    private Double sumGaugeValue(String name, String... tags) {
-        List<Double> values = registry.find(name).tags(tags).gauges().stream()
+    private Double sumGaugeValue(MicrometerMeter meter, String... tags) {
+        List<Double> values = registry.find(meter.meterName()).tags(tags).gauges().stream()
                 .map(Gauge::value)
                 .filter(value -> !Double.isNaN(value))
                 .toList();
         return values.isEmpty() ? null : values.stream().mapToDouble(Double::doubleValue).sum();
     }
 
-    private Integer sumIntGaugeValue(String name, String... tags) {
-        Double value = sumGaugeValue(name, tags);
+    private Integer sumIntGaugeValue(MicrometerMeter meter, String... tags) {
+        Double value = sumGaugeValue(meter, tags);
         return value != null ? (int) (double) value : null;
     }
 }
