@@ -2,6 +2,7 @@ import org.springframework.boot.gradle.plugin.SpringBootPlugin
 
 plugins {
     id 'java-library'
+    id 'maven-publish'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.springframework.boot' version '3.5.4' apply false
 }
@@ -36,6 +37,14 @@ dependencies {
 }
 
 jar { enabled = true; archiveClassifier = '' }
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
+}
 
 tasks.named('test') {
     useJUnitPlatform()
