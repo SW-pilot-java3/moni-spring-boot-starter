@@ -7,7 +7,6 @@ import com.moni.global.config.MoniProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -44,7 +43,7 @@ public class MetricsSender {
         try {
             restClient.post()
                     .uri(METRICS_PATH)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
+                    .header("X-API-KEY", properties.getApiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(payload)
                     .retrieve()
