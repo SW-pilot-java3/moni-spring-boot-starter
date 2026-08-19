@@ -72,7 +72,7 @@ moni:
   server-url: https://api.moni.example.com   # Moni 백엔드 base URL
 ```
 
-> **엔드포인트 경로는 직접 지정하지 않습니다.** `moni.server-url`에는 base URL(도메인)만 넣으면 되고, 라이브러리가 내부적으로 `POST {server-url}/api/v1/metrics`로 전송합니다. 인증 헤더(`Authorization: Bearer {api-key}`)도 라이브러리가 자동으로 붙입니다.
+> **엔드포인트 경로는 직접 지정하지 않습니다.** `moni.server-url`에는 base URL(도메인)만 넣으면 되고, 라이브러리가 내부적으로 `POST {server-url}/api/v1/metrics`로 전송합니다. 인증 헤더(`X-API-KEY: {api-key}`)도 라이브러리가 자동으로 붙입니다.
 
 **위 두 설정만 마치면 끝입니다.** 호스트 앱 코드에서 수집·전송을 호출하는 별도 작업은 필요 없습니다. 애플리케이션이 기동되면 라이브러리가 등록한 전용 데몬 스레드가 `moni.interval` 주기로 알아서 수집(Actuator `MeterRegistry`/Node Exporter)부터 전송까지 자동으로 수행합니다.
 
