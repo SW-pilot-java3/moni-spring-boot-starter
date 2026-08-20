@@ -11,6 +11,7 @@ import com.moni.domain.instance.dto.request.InstanceFilesystemMetrics;
 import com.moni.domain.instance.dto.request.InstanceMetrics;
 import com.moni.domain.instance.dto.request.InstanceNetworkMetrics;
 import com.moni.global.config.MoniProperties;
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -22,8 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -38,11 +38,11 @@ public class NodeExporterMetricsCollector implements InstanceMetricsCollector {
 
     public NodeExporterMetricsCollector(MoniProperties properties) {
         this.properties = properties;
-        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
-                .withConnectTimeout(properties.getConnectTimeout())
-                .withReadTimeout(properties.getReadTimeout());
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(properties.getConnectTimeout()).build());
+        requestFactory.setReadTimeout(properties.getReadTimeout());
         this.restClient = RestClient.builder()
-                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(settings))
+                .requestFactory(requestFactory)
                 .build();
     }
 
