@@ -31,7 +31,7 @@ import org.springframework.web.client.RestClientException;
 public class NodeExporterMetricsCollector implements InstanceMetricsCollector {
 
     private static final Pattern LABEL_PATTERN = Pattern.compile("(\\w+)=\"((?:[^\"\\\\]|\\\\.)*)\"");
-    private static final Pattern LOOP_DEVICE_PATTERN = Pattern.compile("loop\\d+");
+    private static final Pattern VIRTUAL_DEVICE_PATTERN = Pattern.compile("loop\\d+|dm-\\d+|ram\\d+");
 
     private final MoniProperties properties;
     private final RestClient restClient;
@@ -102,7 +102,7 @@ public class NodeExporterMetricsCollector implements InstanceMetricsCollector {
 
     private List<InstanceDiskMetrics> diskMetrics(List<Sample> samples) {
         return labelValues(samples, NodeExporterMetric.DISK_READS_TOTAL, NodeExporterLabel.DEVICE).stream()
-                .filter(device -> !LOOP_DEVICE_PATTERN.matcher(device).matches())
+                .filter(device -> !VIRTUAL_DEVICE_PATTERN.matcher(device).matches())
                 .map(device -> InstanceDiskMetrics.builder()
                         .deviceName(device)
                         .readsTotal(longValueFor(samples, NodeExporterMetric.DISK_READS_TOTAL,
