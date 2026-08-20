@@ -19,7 +19,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.util.StringUtils;
 
 @AutoConfiguration
-@AutoConfigureAfter(name = "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration")
+@AutoConfigureAfter(name = {
+        "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration",
+        "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration"
+})
 @EnableConfigurationProperties(MoniProperties.class)
 @ConditionalOnProperty(prefix = "moni", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class MoniAutoConfiguration {
