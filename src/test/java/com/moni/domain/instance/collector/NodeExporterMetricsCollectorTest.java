@@ -35,9 +35,13 @@ class NodeExporterMetricsCollectorTest {
             node_disk_reads_completed_total{device="nvme0n1"} 182345
             node_disk_reads_completed_total{device="nvme1n1"} 45210
             node_disk_reads_completed_total{device="loop0"} 12
+            node_disk_reads_completed_total{device="dm-0"} 34
+            node_disk_reads_completed_total{device="ram0"} 56
             node_disk_writes_completed_total{device="nvme0n1"} 94021
             node_disk_writes_completed_total{device="nvme1n1"} 128900
             node_disk_writes_completed_total{device="loop0"} 0
+            node_disk_writes_completed_total{device="dm-0"} 0
+            node_disk_writes_completed_total{device="ram0"} 0
             node_disk_read_bytes_total{device="nvme0n1"} 5872345088
             node_disk_read_bytes_total{device="nvme1n1"} 943718400
             node_disk_written_bytes_total{device="nvme0n1"} 2103450624
@@ -112,7 +116,7 @@ class NodeExporterMetricsCollectorTest {
     }
 
     @Test
-    void groupsDiskMetricsByDeviceAndExcludesLoopDevices() {
+    void groupsDiskMetricsByDeviceAndExcludesVirtualDevices() {
         InstanceMetrics metrics = collector.parse(SAMPLE_BODY);
 
         assertThat(metrics.disks())

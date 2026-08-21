@@ -1,15 +1,11 @@
 package com.moni.domain.metric.push;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.moni.domain.metric.dto.request.MetricsPayload;
 import com.moni.global.config.MoniProperties;
+import java.net.http.HttpClient;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.MediaType;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -23,19 +19,12 @@ public class MetricsSender {
 
     public MetricsSender(MoniProperties properties) {
         this.properties = properties;
-        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
-                .withConnectTimeout(properties.getConnectTimeout())
-                .withReadTimeout(properties.getReadTimeout());
-        ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json()
-                .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(properties.getConnectTimeout()).build());
+        requestFactory.setReadTimeout(properties.getReadTimeout());
         this.restClient = RestClient.builder()
                 .baseUrl(properties.getServerUrl())
-                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(settings))
-                .messageConverters(converters -> converters.stream()
-                        .filter(MappingJackson2HttpMessageConverter.class::isInstance)
-                        .map(MappingJackson2HttpMessageConverter.class::cast)
-                        .forEach(converter -> converter.setObjectMapper(objectMapper)))
+                .requestFactory(requestFactory)
                 .build();
     }
 

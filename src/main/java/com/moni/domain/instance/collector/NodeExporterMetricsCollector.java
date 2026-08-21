@@ -11,6 +11,7 @@ import com.moni.domain.instance.dto.request.InstanceFilesystemMetrics;
 import com.moni.domain.instance.dto.request.InstanceMetrics;
 import com.moni.domain.instance.dto.request.InstanceNetworkMetrics;
 import com.moni.global.config.MoniProperties;
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -22,8 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -31,18 +31,18 @@ import org.springframework.web.client.RestClientException;
 public class NodeExporterMetricsCollector implements InstanceMetricsCollector {
 
     private static final Pattern LABEL_PATTERN = Pattern.compile("(\\w+)=\"((?:[^\"\\\\]|\\\\.)*)\"");
-    private static final Pattern LOOP_DEVICE_PATTERN = Pattern.compile("loop\\d+");
+    private static final Pattern VIRTUAL_DEVICE_PATTERN = Pattern.compile("loop\\d+|dm-\\d+|ram\\d+");
 
     private final MoniProperties properties;
     private final RestClient restClient;
 
     public NodeExporterMetricsCollector(MoniProperties properties) {
         this.properties = properties;
-        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
-                .withConnectTimeout(properties.getConnectTimeout())
-                .withReadTimeout(properties.getReadTimeout());
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(properties.getConnectTimeout()).build());
+        requestFactory.setReadTimeout(properties.getReadTimeout());
         this.restClient = RestClient.builder()
-                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(settings))
+                .requestFactory(requestFactory)
                 .build();
     }
 
@@ -102,7 +102,7 @@ public class NodeExporterMetricsCollector implements InstanceMetricsCollector {
 
     private List<InstanceDiskMetrics> diskMetrics(List<Sample> samples) {
         return labelValues(samples, NodeExporterMetric.DISK_READS_TOTAL, NodeExporterLabel.DEVICE).stream()
-                .filter(device -> !LOOP_DEVICE_PATTERN.matcher(device).matches())
+                .filter(device -> !VIRTUAL_DEVICE_PATTERN.matcher(device).matches())
                 .map(device -> InstanceDiskMetrics.builder()
                         .deviceName(device)
                         .readsTotal(longValueFor(samples, NodeExporterMetric.DISK_READS_TOTAL,
