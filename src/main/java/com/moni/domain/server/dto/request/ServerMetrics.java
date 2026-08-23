@@ -8,6 +8,7 @@ public record ServerMetrics(
         Long jvmHeapUsedBytes,
         Long jvmHeapMaxBytes,
         Long jvmOldGenUsedBytes,
+        Long jvmOldGenMaxBytes,
         Long gcPauseSecondsCount,
         Double gcPauseSecondsSum,
         Double processUptimeSeconds,

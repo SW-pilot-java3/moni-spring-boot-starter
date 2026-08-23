@@ -52,6 +52,7 @@ class ActuatorMetricsCollectorTest {
         assertThat(metrics.jvmHeapUsedBytes()).isNull();
         assertThat(metrics.jvmHeapMaxBytes()).isNull();
         assertThat(metrics.jvmOldGenUsedBytes()).isNull();
+        assertThat(metrics.jvmOldGenMaxBytes()).isNull();
         assertThat(metrics.gcPauseSecondsCount()).isNull();
         assertThat(metrics.gcPauseSecondsSum()).isNull();
         assertThat(metrics.processUptimeSeconds()).isNull();
@@ -84,6 +85,7 @@ class ActuatorMetricsCollectorTest {
         ServerMetrics metrics = new ActuatorMetricsCollector(registry).collect();
 
         assertThat(metrics.jvmOldGenUsedBytes()).isEqualTo(77L);
+        assertThat(metrics.jvmOldGenMaxBytes()).isEqualTo(300L);
     }
 
     @Test

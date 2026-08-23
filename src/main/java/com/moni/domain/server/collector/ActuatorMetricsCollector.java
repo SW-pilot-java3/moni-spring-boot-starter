@@ -45,6 +45,7 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
                 .jvmHeapUsedBytes(sumGauges())
                 .jvmHeapMaxBytes(sumPositiveGauges())
                 .jvmOldGenUsedBytes(oldGenUsedBytes())
+                .jvmOldGenMaxBytes(oldGenMaxBytes())
                 .gcPauseSecondsCount(gcPauseSecondsCount())
                 .gcPauseSecondsSum(gcPauseSecondsSum())
                 .processUptimeSeconds(sumGaugeValue(MicrometerMeter.PROCESS_UPTIME))
@@ -122,7 +123,15 @@ public class ActuatorMetricsCollector implements ServerMetricsCollector {
     }
 
     private Long oldGenUsedBytes() {
-        return registry.find(MicrometerMeter.JVM_MEMORY_USED.meterName())
+        return oldGenValue(MicrometerMeter.JVM_MEMORY_USED);
+    }
+
+    private Long oldGenMaxBytes() {
+        return oldGenValue(MicrometerMeter.JVM_MEMORY_MAX);
+    }
+
+    private Long oldGenValue(MicrometerMeter meter) {
+        return registry.find(meter.meterName())
                 .tag(MicrometerTag.AREA.key(), MemoryArea.HEAP.value())
                 .gauges().stream()
                 .filter(gauge -> OldGenPoolMarker.matchesPoolId(gauge.getId().getTag(MicrometerTag.ID.key())))
