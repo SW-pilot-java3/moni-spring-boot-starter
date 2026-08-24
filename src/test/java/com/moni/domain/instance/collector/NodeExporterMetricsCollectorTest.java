@@ -64,6 +64,14 @@ class NodeExporterMetricsCollectorTest {
             node_network_transmit_bytes_total{device="lo"} 982345678
             node_network_receive_errs_total{device="lo"} 0
             node_network_transmit_errs_total{device="lo"} 0
+            node_network_receive_bytes_total{device="docker0"} 123456
+            node_network_transmit_bytes_total{device="docker0"} 123456
+            node_network_receive_errs_total{device="docker0"} 0
+            node_network_transmit_errs_total{device="docker0"} 0
+            node_network_receive_bytes_total{device="veth3a1f9c2"} 7890
+            node_network_transmit_bytes_total{device="veth3a1f9c2"} 7890
+            node_network_receive_errs_total{device="veth3a1f9c2"} 0
+            node_network_transmit_errs_total{device="veth3a1f9c2"} 0
             """;
 
     private final NodeExporterMetricsCollector collector = new NodeExporterMetricsCollector(new MoniProperties());
@@ -151,7 +159,7 @@ class NodeExporterMetricsCollectorTest {
     }
 
     @Test
-    void groupsNetworkMetricsByInterfaceAndExcludesLoopback() {
+    void groupsNetworkMetricsByInterfaceAndExcludesVirtualInterfaces() {
         InstanceMetrics metrics = collector.parse(SAMPLE_BODY);
 
         assertThat(metrics.networks())
